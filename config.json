@@ -1,9 +1,16 @@
 {
   "Podcasts": [
     {
-      "Directory": "/Users/david/Dowloads/podcasts/test",
-      "Title": "Test Podcast",
-      "Image": "http://www.rarefrequency.com/images/185_broadcast.jpg"
+      "Directory": "/Users/david/Downloads/podcasts/test",
+      "Title": "Rare Frequencies",
+      "Image": "http://www.rarefrequency.com/images/495-podcast65.jpg",
+      "URL": "http://www.example.com/podcast1/"
+    },
+    {
+      "Directory": "/Users/david/Downloads/podcasts/test-2",
+      "Title": "Vocal Fry",
+      "Image": "https://blogfiles.wfmu.org/VF/VFNWW_Final.jpg",
+      "URL": "http://www.example.com/podcast2/"
     }
   ]
 }
