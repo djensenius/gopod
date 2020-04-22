@@ -108,7 +108,7 @@ func generatePodcastFeed(path string, p Podcasts) {
 	feed.AddImage(podcastData.Image)
 
 	for _, file := range files {
-		if filepath.Ext(file.Name()) == ".mp3" {
+		if filepath.Ext(file.Name()) == ".mp3" || filepath.Ext(file.Name()) == ".aac" {
 			podcastTime := file.ModTime()
 			item := podcast.Item{
 				Title:       file.ModTime().Format("ANSIC"),
@@ -116,7 +116,11 @@ func generatePodcastFeed(path string, p Podcasts) {
 				PubDate:     &podcastTime,
 			}
 			item.AddImage(podcastData.Image)
-			item.AddEnclosure(podcastData.URL+file.Name(), podcast.MP3, file.Size())
+			if filepath.Ext(file.Name()) == ".mp3" {
+				item.AddEnclosure(podcastData.URL+file.Name(), podcast.MP3, file.Size())
+			} else {
+				item.AddEnclosure(podcastData.URL+file.Name(), podcast.M4A, file.Size())
+			}
 			if _, err := feed.AddItem(item); err != nil {
 				os.Stderr.WriteString("item validation error: " + err.Error())
 			}
@@ -137,7 +141,7 @@ func watchDirectories(p Podcasts) {
 	}
 	for ei := range c {
 		e := newEvent(ei)
-		if e.Event == "create" && filepath.Ext(e.Path) == ".mp3" {
+		if e.Event == "create" && (filepath.Ext(e.Path) == ".mp3" || filepath.Ext(e.Path) == ".aac") {
 			generatePodcastFeed(e.Path, p)
 		}
 	}
