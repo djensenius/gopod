@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
+	"strings"
 
 	"github.com/eduncan911/podcast"
 	"github.com/rjeczalik/notify"
@@ -26,6 +27,7 @@ type Podcast struct {
 	Directory string
 	Image     string
 	URL       string
+	PodcastURL string
 }
 
 // Event : Filesystem change data
@@ -83,15 +85,32 @@ func (files ByModTime) Less(i, j int) bool {
 	return files[i].ModTime().Before(files[j].ModTime())
 }
 
-func generatePodcastFeed(path string, p Podcasts) {
-	var podcastData *Podcast
+func getPodcastData(path string, p Podcasts) Podcast {
+	var podcastData Podcast
 	dir := filepath.Dir(path)
 	for _, pc := range p.Podcasts {
-		if pc.Directory == dir {
-			podcastData = pc
+		fp, err := filepath.EvalSymlinks(pc.Directory)
+		if (err != nil) {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if fp == dir {
+			podcastData = Podcast {
+				Directory: pc.Directory,
+				Title: pc.Title,
+				Image: pc.Image,
+				URL: pc.URL,
+				PodcastURL: pc.PodcastURL,
+			}
+			return podcastData
 		}
 	}
+	return podcastData
+}
 
+func generatePodcastFeed(path string, p Podcasts) {
+	podcastData := getPodcastData(path, p)
+	dir := filepath.Dir(path)
 	f, _ := os.Open(dir)
 	files, _ := f.Readdir(-1)
 	f.Close()
@@ -101,7 +120,7 @@ func generatePodcastFeed(path string, p Podcasts) {
 
 	feed := podcast.New(
 		podcastData.Title,
-		"",
+		podcastData.PodcastURL,
 		podcastData.Title,
 		&pubDate, &updatedDate,
 	)
@@ -110,16 +129,21 @@ func generatePodcastFeed(path string, p Podcasts) {
 	for _, file := range files {
 		if filepath.Ext(file.Name()) == ".mp3" || filepath.Ext(file.Name()) == ".aac" {
 			podcastTime := file.ModTime()
+			title := podcastData.Title + " " + file.ModTime().Format(time.RFC850)
+			var podcastDownload strings.Builder
+			podcastDownload.WriteString(podcastData.URL)
+			podcastDownload.WriteString(file.Name())
 			item := podcast.Item{
-				Title:       file.ModTime().Format("ANSIC"),
+				Title:       title,
+				Link:        podcastDownload.String(),
 				Description: "📻🤖",
 				PubDate:     &podcastTime,
 			}
 			item.AddImage(podcastData.Image)
 			if filepath.Ext(file.Name()) == ".mp3" {
-				item.AddEnclosure(podcastData.URL+file.Name(), podcast.MP3, file.Size())
+				item.AddEnclosure(podcastDownload.String(), podcast.MP3, file.Size())
 			} else {
-				item.AddEnclosure(podcastData.URL+file.Name(), podcast.M4A, file.Size())
+				item.AddEnclosure(podcastDownload.String(), podcast.M4A, file.Size())
 			}
 			if _, err := feed.AddItem(item); err != nil {
 				os.Stderr.WriteString("item validation error: " + err.Error())
