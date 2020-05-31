@@ -87,7 +87,7 @@ func (files ByModTime) Less(i, j int) bool {
 
 func getPodcastData(path string, p Podcasts) Podcast {
 	var podcastData Podcast
-	dir := filepath.Dir(path)
+	dir := filepath.Dir(path + "/")
 	for _, pc := range p.Podcasts {
 		fp, err := filepath.EvalSymlinks(pc.Directory)
 		if (err != nil) {
@@ -110,8 +110,8 @@ func getPodcastData(path string, p Podcasts) Podcast {
 
 func generatePodcastFeed(path string, p Podcasts) {
 	podcastData := getPodcastData(path, p)
-	dir := filepath.Dir(path)
-	f, _ := os.Open(dir)
+	fullDir := filepath.Dir(path + "/")
+	f, _ := os.Open(fullDir)
 	files, _ := f.Readdir(-1)
 	f.Close()
 	sort.Sort(ByModTime(files))
@@ -150,24 +150,14 @@ func generatePodcastFeed(path string, p Podcasts) {
 			}
 		}
 	}
-	if err := ioutil.WriteFile(dir+"/podcast.rss", feed.Bytes(), 0755); err != nil {
+	if err := ioutil.WriteFile(fullDir+"/podcast.rss", feed.Bytes(), 0755); err != nil {
 		fmt.Println("error writing to stdout:", err.Error())
 	}
 }
 
 func watchDirectories(p Podcasts) {
-	c := make(chan notify.EventInfo, 1)
 	for _, path := range p.Podcasts {
-		if err := notify.Watch(path.Directory, c, notify.All); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-	}
-	for ei := range c {
-		e := newEvent(ei)
-		if e.Event == "create" && (filepath.Ext(e.Path) == ".mp3" || filepath.Ext(e.Path) == ".aac") {
-			generatePodcastFeed(e.Path, p)
-		}
+		generatePodcastFeed(path.Directory, p)
 	}
 }
 
