@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
@@ -150,7 +149,7 @@ func generatePodcastFeed(path string, p Podcasts) {
 			}
 		}
 	}
-	if err := ioutil.WriteFile(fullDir+"/podcast.rss", feed.Bytes(), 0755); err != nil {
+	if err := os.WriteFile(fullDir+"/podcast.rss", feed.Bytes(), 0755); err != nil {
 		fmt.Println("error writing to stdout:", err.Error())
 	}
 }
