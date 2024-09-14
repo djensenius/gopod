@@ -8,10 +8,10 @@
       "PodcastURL": "http://example.com"
     },
     {
-      "Directory": "/Users/david/Downloads/podcasts/test-2",
+      "Directory": "/Users/david/Downloads/podcasts/test2",
       "Title": "Vocal Fry",
       "Image": "https://blogfiles.wfmu.org/VF/VFNWW_Final.jpg",
-      "URL": "http://www.example.com/podcast2/"
+      "URL": "http://www.example.com/podcast2/",
       "PodcastURL": "http://example.com"
     }
   ]

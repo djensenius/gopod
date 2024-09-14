@@ -10,9 +10,8 @@ import (
 	"sort"
 	"time"
 	"strings"
-
 	"github.com/eduncan911/podcast"
-	"github.com/rjeczalik/notify"
+  // "github.com/rjeczalik/notify"
 )
 
 // Podcasts : Array of podcasts
@@ -41,23 +40,31 @@ type ByModTime []os.FileInfo
 func loadConfig() Podcasts {
 	user, err := user.Current()
 	if err != nil {
-		log.Fatalf(err.Error())
+    log.Fatalf("Could not find user: %s", err.Error())
 	}
 	homeDirectory := user.HomeDir
 	config, err := os.Open(homeDirectory + "/.config/gopod/config.json")
+  errorPresent := false
 	if err != nil {
-		log.Fatalf(err.Error())
+    log.Printf("Could not find config file: %s, using default config", err.Error())
+    errorPresent = true
 	}
+
+  if errorPresent {
+    config, _ = os.Open("config.json.sample")
+  }
+
 	defer config.Close()
 	decoder := json.NewDecoder(config)
 	podcasts := Podcasts{}
 	err = decoder.Decode(&podcasts)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatalf("Could not decode podcast %s", err.Error())
 	}
 	return podcasts
 }
 
+/*
 var mapping = map[notify.Event]string{
 	notify.Create: "create",
 	notify.Remove: "remove",
@@ -71,6 +78,7 @@ func newEvent(ei notify.EventInfo) Event {
 		Event: mapping[ei.Event()],
 	}
 }
+*/
 
 func (files ByModTime) Len() int {
 	return len(files)
