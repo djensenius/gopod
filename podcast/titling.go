@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+  "os"
 	"strconv"
+  "time"
 )
 
 // GetStreamTitle get the current song/show in an Icecast stream
@@ -87,4 +89,55 @@ func getStreamMetas(streamUrl string) ([]byte, error) {
 
 	resp.Body.Close()
 	return m, nil
+}
+
+func MonitorStream(streamUrl string, duration time.Duration) (string, error) {
+  overallProgress := time.Now()
+  fileContent := ""
+  formerTitle := ""
+  count := 0
+
+  for time.Since(overallProgress) < duration {
+    start := time.Now()
+    title, err := GetStreamTitle(streamUrl)
+    if err != nil {
+      return "", err
+    }
+
+    if title != formerTitle {
+      if formerTitle != "" {
+        fileContent += "END=" + strconv.Itoa(count) + "\n"
+        fileContent += "title=" + formerTitle + "\n\n"
+      }
+
+      fileContent += "[CHAPTER]\n"
+      fileContent += "TIMEBASE=1/1000\n"
+      fileContent += "START=" + strconv.Itoa(count + 1) + "\n"
+      if title != "" {
+        formerTitle = title
+      } else {
+        formerTitle = "Unknown"
+      }
+    }
+
+    // Don't query more than once a second
+    timeLeft := time.Second - time.Since(start)
+    if timeLeft > 0 {
+      time.Sleep(timeLeft)
+    }
+    count += 1
+  }
+
+  fileContent += "END=" + strconv.Itoa(count) + "\n"
+  fileContent += "title=" + formerTitle + "\n\n"
+  f, err := os.CreateTemp("", "sample")
+  if err != nil {
+    return "", err
+  }
+
+  if _, err := f.Write([]byte(fileContent)); err != nil {
+    return "", err
+  }
+
+  return f.Name(), nil
 }

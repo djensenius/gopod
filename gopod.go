@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/user"
+  "time"
   "gopod/podcast"
 )
 
@@ -45,6 +46,11 @@ func main() {
       log.Fatalf("Could not find podcast %s", args[1])
     }
     podcast.Record(pod)
+    file, err := podcast.MonitorStream(pod.SourceURL, time.Duration(pod.Length) * time.Second)
+    if err != nil {
+      log.Fatalf("Could not monitor stream %s", err.Error())
+    }
+
     podcast.GeneratePodcastFeed(pod.Directory, p)
   } else {
     log.Fatal("No podcast specified")
