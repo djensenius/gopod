@@ -3,16 +3,22 @@
     {
       "Directory": "/Users/david/Downloads/podcasts/test",
       "Title": "Rare Frequencies",
+      "ShortTitle": "rf",
       "Image": "http://www.rarefrequency.com/images/495-podcast65.jpg",
       "URL": "http://www.example.com/podcast1/",
-      "PodcastURL": "http://example.com"
+      "PodcastURL": "https://wfmu.org/wfmu.pls",
+      "SourceURL": "https://example.com/stream.aac",
+      "length": 10
     },
     {
       "Directory": "/Users/david/Downloads/podcasts/test2",
       "Title": "Vocal Fry",
+      "ShortTitle": "vf",
       "Image": "https://blogfiles.wfmu.org/VF/VFNWW_Final.jpg",
       "URL": "http://www.example.com/podcast2/",
-      "PodcastURL": "http://example.com"
+      "PodcastURL": "http://example.com",
+      "SourceURL": "https://example.com/stream.aac",
+      "length": 10
     }
   ]
 }
