@@ -8,7 +8,8 @@
       "URL": "http://www.example.com/podcast1/",
       "PodcastURL": "https://wfmu.org/wfmu.pls",
       "SourceURL": "https://example.com/stream.aac",
-      "length": 10
+      "length": 10,
+      "extension": "aac"
     },
     {
       "Directory": "/Users/david/Downloads/podcasts/test2",
@@ -19,6 +20,7 @@
       "PodcastURL": "http://example.com",
       "SourceURL": "https://example.com/stream.aac",
       "length": 30
+      "extension": "mp3"
     }
   ]
 }

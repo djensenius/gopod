@@ -93,7 +93,7 @@ func getStreamMetas(streamUrl string) ([]byte, error) {
 
 func MonitorStream(streamUrl string, duration time.Duration) (string, error) {
   overallProgress := time.Now()
-  fileContent := ""
+  fileContent := ";FFMETADATA1\n\n"
   formerTitle := ""
   count := 0
 
@@ -111,7 +111,7 @@ func MonitorStream(streamUrl string, duration time.Duration) (string, error) {
       }
 
       fileContent += "[CHAPTER]\n"
-      fileContent += "TIMEBASE=1/1000\n"
+      fileContent += "TIMEBASE=1/1\n"
       fileContent += "START=" + strconv.Itoa(count + 1) + "\n"
       if title != "" {
         formerTitle = title
@@ -130,11 +130,13 @@ func MonitorStream(streamUrl string, duration time.Duration) (string, error) {
 
   fileContent += "END=" + strconv.Itoa(count) + "\n"
   fileContent += "title=" + formerTitle + "\n\n"
-  f, err := os.CreateTemp("", "sample")
+  f, err := os.CreateTemp("", "*.txt")
   if err != nil {
     return "", err
   }
 
+  fmt.Println("Writing file: " + f.Name())
+  fmt.Println("File content: " + fileContent)
   if _, err := f.Write([]byte(fileContent)); err != nil {
     return "", err
   }

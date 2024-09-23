@@ -25,6 +25,7 @@ type Podcast struct {
 	URL       string
 	PodcastURL string
   SourceURL string
+  Extension string
   Length    int
 }
 
