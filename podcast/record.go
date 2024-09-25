@@ -33,9 +33,9 @@ func Record(podcast Podcast) (string, error) {
 
 func Combine(podcast Podcast, audioFile string, metaFile string, descriptionFile string) (error) {
   nowTime := time.Now().Unix()
-  name := fmt.Sprintf("%s-%d.%s", podcast.ShortTitle, nowTime, podcast.Extension)
+  name := fmt.Sprintf("%s-%d.m4a", podcast.ShortTitle, nowTime)
   fileName := podcast.Directory + "/" + name
-  cmd := exec.Command("ffmpeg", "-i", audioFile, "-i", metaFile, "-map_metadata", "1", "-codec", "copy",  fileName)
+  cmd := exec.Command("ffmpeg", "-i", audioFile, "-i", metaFile, "-map_metadata", "1", "-c:a", "aac",  fileName)
   err := cmd.Run()
   if err != nil {
     return err
