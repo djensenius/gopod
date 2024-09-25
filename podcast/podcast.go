@@ -106,7 +106,7 @@ func GeneratePodcastFeed(path string, p Podcasts) {
 	feed.AddImage(podcastData.Image)
 
 	for _, file := range files {
-		if filepath.Ext(file.Name()) == ".mp3" || filepath.Ext(file.Name()) == ".aac" {
+		if filepath.Ext(file.Name()) == ".mp3" || filepath.Ext(file.Name()) == ".aac" || filepath.Ext(file.Name()) == ".m4a" {
 			podcastTime := file.ModTime()
 			title := podcastData.Title + " " + file.ModTime().Format(time.RFC850)
 			var podcastDownload strings.Builder
