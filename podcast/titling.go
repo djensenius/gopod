@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+  "net/url"
   "os"
 	"strconv"
   "time"
@@ -91,28 +92,32 @@ func getStreamMetas(streamUrl string) ([]byte, error) {
 	return m, nil
 }
 
-func MonitorStream(streamUrl string, duration time.Duration) (string, error) {
+func MonitorStream(streamUrl string, duration time.Duration) (string, string, error) {
   overallProgress := time.Now()
   fileContent := ";FFMETADATA1\n\n"
   formerTitle := ""
   count := 0
+  chapterStart := 0;
+  notes := ""
 
   for time.Since(overallProgress) < duration {
     start := time.Now()
     title, err := GetStreamTitle(streamUrl)
     if err != nil {
-      return "", err
+      return "", "", err
     }
 
     if title != formerTitle {
       if formerTitle != "" {
         fileContent += "END=" + strconv.Itoa(count) + "\n"
         fileContent += "title=" + formerTitle + "\n\n"
+        notes += strconv.Itoa(chapterStart) + " to " + strconv.Itoa(count) + ": " + formerTitle + "\n"
       }
 
       fileContent += "[CHAPTER]\n"
       fileContent += "TIMEBASE=1/1\n"
       fileContent += "START=" + strconv.Itoa(count + 1) + "\n"
+      chapterStart = count
       if title != "" {
         formerTitle = title
       } else {
@@ -130,16 +135,33 @@ func MonitorStream(streamUrl string, duration time.Duration) (string, error) {
 
   fileContent += "END=" + strconv.Itoa(count) + "\n"
   fileContent += "title=" + formerTitle + "\n\n"
+  notes += strconv.Itoa(chapterStart) + " to " + strconv.Itoa(count) + ": " + formerTitle + "\n"
+  params := url.Values{}
+	params.Add("term", formerTitle)
+  
+  bandCampParams := url.Values{}
+  bandCampParams.Add("q", formerTitle)
+
+  notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
+  notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a> "
   f, err := os.CreateTemp("", "*.txt")
   if err != nil {
-    return "", err
+    return "", "", err
   }
 
-  fmt.Println("Writing file: " + f.Name())
-  fmt.Println("File content: " + fileContent)
   if _, err := f.Write([]byte(fileContent)); err != nil {
-    return "", err
+    return "", "", err
   }
 
-  return f.Name(), nil
+  noteFile, err := os.CreateTemp("", "*.txt")
+  
+  if err != nil {
+    return "", "", err
+  }
+
+  if _, err := noteFile.Write([]byte(notes)); err != nil {
+    return "", "", err
+  }
+
+  return f.Name(), noteFile.Name(), nil
 }

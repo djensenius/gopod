@@ -8,13 +8,10 @@ import (
 )
 
 func Record(podcast Podcast) (string, error) {
-  fmt.Println("Recording podcast: " + podcast.Title)
-  fmt.Println("Directory: " + podcast.Directory)
-  fmt.Println("Image: " + podcast.Image)
-  fmt.Println("URL: " + podcast.URL)
-  fmt.Println("Podcast URL: " + podcast.PodcastURL)
-  fmt.Println("Source URL: " + podcast.SourceURL)
-  fmt.Println("Length: ", podcast.Length)
+  var Reset = "\033[0m" 
+  var Green = "\033[32m" 
+  var Blue = "\033[34m"
+  fmt.Println(Green + "🔴 Recording podcast: " + Blue + podcast.Title + Reset)
   f, err := os.CreateTemp("", "gopod-recording")
   if err != nil {
     return "", err
@@ -34,14 +31,28 @@ func Record(podcast Podcast) (string, error) {
   return tmpFile, nil
 }
 
-func Combine(podcast Podcast, audioFile string, metaFile string) (string, error) {
-  name := fmt.Sprintf("%s-%d.%s", podcast.ShortTitle, time.Now().Unix(), podcast.Extension)
+func Combine(podcast Podcast, audioFile string, metaFile string, descriptionFile string) (error) {
+  nowTime := time.Now().Unix()
+  name := fmt.Sprintf("%s-%d.%s", podcast.ShortTitle, nowTime, podcast.Extension)
   fileName := podcast.Directory + "/" + name
   cmd := exec.Command("ffmpeg", "-i", audioFile, "-i", metaFile, "-map_metadata", "1", "-codec", "copy",  fileName)
-  fmt.Println("Running command: " + cmd.String())
   err := cmd.Run()
   if err != nil {
-    return "", err
+    return err
   }
-  return fileName, nil
+
+  descName := fmt.Sprintf("%s-%d.txt", podcast.ShortTitle, nowTime)
+  descFileName := podcast.Directory + "/" + descName
+  if descriptionFile != "" {
+    data, err := os.ReadFile(descriptionFile)
+    if err != nil {
+      return err
+    }
+    writeErr := os.WriteFile(descFileName, data, 0644)
+    if writeErr != nil {
+      return writeErr
+    }
+  }
+
+  return nil
 }

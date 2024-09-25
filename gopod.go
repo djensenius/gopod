@@ -39,6 +39,8 @@ func loadConfig() podcast.Podcasts {
 }
 
 func main() {
+  var Reset = "\033[0m" 
+  var Green = "\033[32m"
   var wg sync.WaitGroup
 	p := loadConfig()
   args := os.Args
@@ -53,11 +55,12 @@ func main() {
     wg.Add(1)
     go func(meta chan string) {
       defer wg.Done()
-      metaFile, err := podcast.MonitorStream(pod.SourceURL, time.Duration(pod.Length) * time.Second)
+      metaFile, descriptionFile, err := podcast.MonitorStream(pod.SourceURL, time.Duration(pod.Length) * time.Second)
       if err != nil {
         log.Fatalf("Could not monitor stream %s", err.Error())
       }
       meta <-metaFile
+      meta <-descriptionFile
     }(meta)
 
     wg.Add(1)
@@ -72,19 +75,20 @@ func main() {
 
     recordedFile := <-record
     metaFile := <-meta
+    descriptionFile := <-meta
     wg.Wait()
 
-    combined, err := podcast.Combine(pod, recordedFile, metaFile)
-    if err != nil {
-      log.Fatalf("Could not combine podcast %s", err.Error())
+    combineErr := podcast.Combine(pod, recordedFile, metaFile, descriptionFile)
+    if combineErr != nil {
+      log.Fatalf("Could not combine podcast %s", combineErr.Error())
     }
     os.Remove(recordedFile)
     os.Remove(metaFile)
-    fmt.Println("Combined file: " + combined)
+    os.Remove(descriptionFile)
 
     podcast.GeneratePodcastFeed(pod.Directory, p)
   } else {
     log.Fatal("No podcast specified")
   }
-  fmt.Println("Podcast feed generated")
+  fmt.Println(Green + "✅ Podcast feed generated" + Reset)
 }

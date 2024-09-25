@@ -1,13 +1,13 @@
 package podcast
 
 import (
-	"fmt"
-	"os"
   "errors"
+  "log"
+	"os"
 	"path/filepath"
 	"sort"
-	"time"
 	"strings"
+	"time"
 	"github.com/eduncan911/podcast"
 )
 
@@ -71,8 +71,7 @@ func getPodcastData(path string, p Podcasts) Podcast {
 	for _, pc := range p.Podcasts {
 		fp, err := filepath.EvalSymlinks(pc.Directory)
 		if (err != nil) {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+      log.Fatalf("error evaluating symlinks: %s", err)
 		}
 		if fp == dir {
 			podcastData = Podcast {
@@ -113,10 +112,20 @@ func GeneratePodcastFeed(path string, p Podcasts) {
 			var podcastDownload strings.Builder
 			podcastDownload.WriteString(podcastData.URL)
 			podcastDownload.WriteString(file.Name())
+
+      description := "📻🤖"
+      descriptionFile := strings.TrimSuffix(file.Name(), filepath.Ext(file.Name())) + ".txt"
+      if descriptionFile != "" {
+        data, err := os.ReadFile(fullDir + "/" + descriptionFile)
+        if err == nil {
+          description = string(data)
+        }
+      }
+
 			item := podcast.Item{
 				Title:       title,
 				Link:        podcastDownload.String(),
-				Description: "📻🤖",
+				Description: description,
 				PubDate:     &podcastTime,
 			}
 			item.AddImage(podcastData.Image)
@@ -131,6 +140,6 @@ func GeneratePodcastFeed(path string, p Podcasts) {
 		}
 	}
 	if err := os.WriteFile(fullDir+"/podcast.rss", feed.Bytes(), 0755); err != nil {
-		fmt.Println("error writing to stdout:", err.Error())
+    log.Fatalf("error writing to stdout: %s", err)
 	}
 }
