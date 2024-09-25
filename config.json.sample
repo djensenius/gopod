@@ -6,21 +6,10 @@
       "ShortTitle": "rf",
       "Image": "http://www.rarefrequency.com/images/495-podcast65.jpg",
       "URL": "http://www.example.com/podcast1/",
-      "PodcastURL": "https://wfmu.org/wfmu.pls",
+      "PodcastURL": "https://spinitron.com/WZBC/show/792/Rare-Frequency",
       "SourceURL": "https://example.com/stream.aac",
-      "length": 10,
-      "extension": "aac"
-    },
-    {
-      "Directory": "/Users/david/Downloads/podcasts/test2",
-      "Title": "Vocal Fry",
-      "ShortTitle": "vf",
-      "Image": "https://blogfiles.wfmu.org/VF/VFNWW_Final.jpg",
-      "URL": "http://www.example.com/podcast2/",
-      "PodcastURL": "http://example.com",
-      "SourceURL": "https://example.com/stream.aac",
-      "length": 30
-      "extension": "mp3"
+      "Length": 10,
+      "Extension": "aac"
     }
   ]
 }

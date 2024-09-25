@@ -1,19 +1,68 @@
 # GoPod
-Automatically create podcast feed from directory of audio files. GoPod watches a directory for when files are posted. Written in Go.
+
+This is a simple tool to record podcasts from online radio sources and build them into podcast feeds.
+
+Requires `ffmpeg` to be installed.
 
 ## Config
 
-Edit the config sample file and move it to `~/.config/gopod/config.json`.
+Example config file:
+
+Format is a JSON object with a `Podcasts` key that is an array of objects. Each object has the following keys:
+- `Directory`: The directory to save the podcast to
+- `Title`: The title of the podcast
+- `ShortTitle`: A short title for the podcast that’s used in the filename
+- `Image`: A URL to an image to use for podcast art
+- `URL`: The URL base for the podcast feed. This is the URL that will be used to access the podcast feed and audio files
+- `PodcastURL`: A link to the website for the podcast feed
+- `SourceURL` The URL of the audio stream
+- `Length`: The length of the podcast in seconds
+- `Extension`: The extension of the audio file (`mp3` or `aac`)
+
+
+Example config file:
+```json
+{
+  "Podcasts": [
+    {
+      "Directory": "/Users/david/Downloads/podcasts/test",
+      "Title": "Rare Frequencies",
+      "ShortTitle": "rf",
+      "Image": "https://farm1.staticflickr.com/742/21709331051_913ccb063a_m.jpg",
+      "URL": "http://www.example.com/podcast1/",
+      "PodcastURL": "https://spinitron.com/WZBC/show/792/Rare-Frequency",
+      "SourceURL": "https://stream.wzbc.org/wzbc",
+      "Length": 7320,
+      "Extension": "mp3"
+    },
+    {
+      "Directory": "/Users/david/Downloads/podcasts/test2",
+      "Title": "Vocal Fry",
+      "ShortTitle": "vf",
+      "Image": "https://blogfiles.wfmu.org/VF/VFNWW_Final.jpg",
+      "URL": "http://www.example.com/podcast2/",
+      "PodcastURL": "https://www.wfmu.org/playlists/VF",
+      "SourceURL": "https://stream0.wfmu.org/freeform-high.aac",
+      "Length": 3720,
+      "Extension": "aac"
+    }
+  ]
+}
+```
 
 A file called `podcast.rss` is put in the same directory as the audio files.
 
-## Example
+## Use & example crontab
 
-I use [StreamRipper](http://streamripper.sourceforge.net) to record radio stations on the internet. I then use this program to create a podcast feed. My crontab looks like this:
+To use the app run:
+
+```./gopod rf```
+
+Replace `rf` with the short title of the podcast you want to record.
+
+I activate the using crontabs. Here are some example crontabs to get you started:
 
 ```
-00 19 * * THU streamripper http://amber.streamguys.com:4860/listen.pls -a -A -s -l 10800 -d /home/david/podcasts/tmp/ -u "Mozilla/5.0 (iPhone; CPU iPhone OS 13_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Mobile/15E148 Safari/604.1"; mv /home/david/podcasts/tmp/* /home/david/podcasts/rf/
-00 19 * * 1 streamripper http://wfmu.org/wfmu.pls -a -A -s -l 3600 -d /home/david/podcasts/tmp/ -u "Mozilla/5.0 (iPhone; CPU iPhone OS 13_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Mobile/15E148 Safari/604.1"; mv /home/david/podcasts/tmp/* /home/david/podcasts/vf/
+59 21 * * 4 /home/david/Code/gopod/gopod rf
+59 19 * * 2 /home/david/Code/gopod/gopod vf
 ```
-
-I trust you can set up an httpd server to serve the files. 💪
