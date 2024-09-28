@@ -8,10 +8,6 @@ import (
 )
 
 func Record(podcast Podcast) (string, error) {
-  var Reset = "\033[0m" 
-  var Green = "\033[32m" 
-  var Blue = "\033[34m"
-  fmt.Println(Green + "🔴 Recording podcast: " + Blue + podcast.Title + Reset)
   f, err := os.CreateTemp("", "gopod-recording")
   if err != nil {
     return "", err
