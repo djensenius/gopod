@@ -55,7 +55,7 @@ func main() {
     wg.Add(1)
     go func(meta chan string) {
       defer wg.Done()
-      metaFile, descriptionFile, err := podcast.MonitorStream(pod.SourceURL, time.Duration(pod.Length) * time.Second)
+      metaFile, descriptionFile, err := podcast.MonitorStream(pod.SourceURL, time.Duration(pod.Length) * time.Second, pod.Title)
       if err != nil {
         log.Fatalf("Could not monitor stream %s", err.Error())
       }
@@ -90,5 +90,5 @@ func main() {
   } else {
     log.Fatal("No podcast specified")
   }
-  fmt.Println(Green + "✅ Podcast feed generated" + Reset)
+  fmt.Println("\n" + Green + "✅ Podcast feed generated" + Reset)
 }

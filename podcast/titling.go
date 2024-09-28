@@ -5,11 +5,14 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+  "log"
 	"net/http"
   "net/url"
   "os"
 	"strconv"
   "time"
+  "github.com/schollz/progressbar/v3"
+  "github.com/k0kubun/go-ansi"
 )
 
 // GetStreamTitle get the current song/show in an Icecast stream
@@ -92,13 +95,29 @@ func getStreamMetas(streamUrl string) ([]byte, error) {
 	return m, nil
 }
 
-func MonitorStream(streamUrl string, duration time.Duration) (string, string, error) {
+func MonitorStream(streamUrl string, duration time.Duration, title string) (string, string, error) {
   overallProgress := time.Now()
   fileContent := ";FFMETADATA1\n\n"
   formerTitle := ""
   count := 0
-  chapterStart := 0;
+  chapterStart := 0
   notes := ""
+  var t time.Time
+
+  bar := progressbar.NewOptions(int(duration.Seconds()),
+    progressbar.OptionSetWriter(ansi.NewAnsiStdout()), //you should install "github.com/k0kubun/go-ansi"
+    progressbar.OptionEnableColorCodes(true),
+    progressbar.OptionShowBytes(false),
+    progressbar.OptionSetWidth(25),
+    progressbar.OptionSetPredictTime(false),
+    progressbar.OptionSetDescription("[green]🔴 Recording podcast: [blue]" + title + "[reset]"),
+    progressbar.OptionSetTheme(progressbar.Theme{
+      Saucer:        "[green]=[reset]",
+      SaucerHead:    "[green]>[reset]",
+      SaucerPadding: " ",
+      BarStart:      "[",
+      BarEnd:        "]",
+    }))
 
   for time.Since(overallProgress) < duration {
     start := time.Now()
@@ -111,7 +130,19 @@ func MonitorStream(streamUrl string, duration time.Duration) (string, string, er
       if formerTitle != "" {
         fileContent += "END=" + strconv.Itoa(count) + "\n"
         fileContent += "title=" + formerTitle + "\n\n"
-        notes += strconv.Itoa(chapterStart) + " to " + strconv.Itoa(count) + ": " + formerTitle + "\n"
+        params := url.Values{}
+        params.Add("term", formerTitle)
+  
+        bandCampParams := url.Values{}
+        bandCampParams.Add("q", formerTitle)
+        t = t.Add(time.Duration(chapterStart) * time.Second)
+        startFormat := t.Format("15:04:05")
+        t = t.Add(time.Duration(count) * time.Second)
+        endFormat := t.Format("15:04:05")
+
+        notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
+        notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
+        notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a><br /> "
       }
 
       fileContent += "[CHAPTER]\n"
@@ -129,13 +160,23 @@ func MonitorStream(streamUrl string, duration time.Duration) (string, string, er
     timeLeft := time.Second - time.Since(start)
     if timeLeft > 0 {
       time.Sleep(timeLeft)
+      err = bar.Add(1)
+      if err != nil {
+        log.Fatalf("Could not add to progress bar %s", err.Error())
+      }
     }
     count += 1
   }
 
   fileContent += "END=" + strconv.Itoa(count) + "\n"
   fileContent += "title=" + formerTitle + "\n\n"
-  notes += strconv.Itoa(chapterStart) + " to " + strconv.Itoa(count) + ": " + formerTitle + "\n"
+
+  t = t.Add(time.Duration(chapterStart) * time.Second)
+  startFormat := t.Format("15:04:05")
+  t = t.Add(time.Duration(count) * time.Second)
+  endFormat := t.Format("15:04:05")
+
+  notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
   params := url.Values{}
 	params.Add("term", formerTitle)
   
@@ -143,7 +184,7 @@ func MonitorStream(streamUrl string, duration time.Duration) (string, string, er
   bandCampParams.Add("q", formerTitle)
 
   notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
-  notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a> "
+  notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a><br /> "
   f, err := os.CreateTemp("", "*.txt")
   if err != nil {
     return "", "", err
