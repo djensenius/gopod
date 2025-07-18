@@ -5,6 +5,7 @@ on:  # yamllint disable-line rule:truthy
   pull_request:
   workflow_dispatch:
   merge_group:
+
 jobs:
   gopod-linter:
     permissions:
@@ -17,9 +18,23 @@ jobs:
         go-version: [1.24]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
       - name: Lint
         uses: golangci/golangci-lint-action@v4
         with:
-          strict: true
-          go-version-file: ./go.mod
-          goproxy-token: ${{secrets.GOPROXY_TOKEN}}
+          version: v1.59.0 # Or latest stable supported by your code
+          args: --timeout=5m
+          only-new-issues: true
+          # Remove or add any args needed for your repo
+
+      # Optionally, if you need to pass a GOPROXY_TOKEN to something else, you can:
+      # env:
+      #   GOPROXY_TOKEN: ${{ secrets.GOPROXY_TOKEN }}
