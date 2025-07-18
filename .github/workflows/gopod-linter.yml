@@ -30,11 +30,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v4
         with:
-          version: v1.59.0 # Or latest stable supported by your code
+          version: v1.59.0  # Or latest stable supported by your code
           args: --timeout=5m
           only-new-issues: true
           # Remove or add any args needed for your repo
-
-      # Optionally, if you need to pass a GOPROXY_TOKEN to something else, you can:
-      # env:
-      #   GOPROXY_TOKEN: ${{ secrets.GOPROXY_TOKEN }}
