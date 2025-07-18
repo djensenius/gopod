@@ -1,0 +1,25 @@
+---
+name: "GoPod Linter (Required)"
+run-name: "Linter (Required)"
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+  workflow_dispatch:
+  merge_group:
+jobs:
+  gopod-linter:
+    permissions:
+      id-token: write
+      contents: read
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.24]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          strict: true
+          go-version-file: ./go.mod
+          goproxy-token: ${{secrets.GOPROXY_TOKEN}}

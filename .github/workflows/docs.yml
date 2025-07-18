@@ -1,0 +1,36 @@
+---
+name: "Generate and Deploy GoDoc"
+permissions:
+  id-token: write
+  contents: write
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-docs:
+    name: Generate and Deploy GoDoc
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install golds
+        run: go install go101.org/golds@latest
+
+      - name: Generate static HTML docs with golds
+        run: golds -gen -emphasize-wdpkgs -nouses -dir ./docs
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./docs
