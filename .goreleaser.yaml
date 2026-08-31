@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: gopod
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
+
+builds:
+  - id: gopod
+    main: .
+    binary: gopod
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: amd64
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X main.version={{ .Version }}
+        -X main.commit={{ .Commit }}
+        -X main.date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: gopod
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    builds_info:
+      group: root
+      owner: root
+      mtime: "{{ .CommitDate }}"
+    files:
+      - README.md
+      - LICENSE
+      - config.json.sample
+      - docs/*.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^chore:"
+      - "^docs:"
+      - "^test:"
+      - "^Merge pull request"
+
+release:
+  name_template: "GoPod {{ .Tag }}"
+  draft: true
+  use_existing_draft: true
+  prerelease: auto
+  make_latest: false
+  mode: keep-existing
+  replace_existing_artifacts: true
+  preflight:
+    fail_on_error: true
+  footer: >-
+
+    Native archives require `ffmpeg` to be installed separately.

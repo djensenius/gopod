@@ -1,0 +1,28 @@
+services:
+  gopod:
+    image: ghcr.io/djensenius/gopod:${GOPOD_IMAGE_TAG:-v0.1.0}
+    user: "${GOPOD_UID:-10001}:${GOPOD_GID:-10001}"
+    command:
+      - schedule
+      - /config/crontab
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+      GOPOD_CRONTAB: /config/crontab
+    volumes:
+      - type: bind
+        source: ${GOPOD_CONFIG_DIR:?Set GOPOD_CONFIG_DIR}
+        target: /config
+        read_only: true
+      - type: bind
+        source: ${GOPOD_DATA_PATH:?Set GOPOD_DATA_PATH}
+        target: /data
+      - type: bind
+        source: ${GOPOD_TMP_PATH:?Set GOPOD_TMP_PATH}
+        target: /tmp
+    restart: unless-stopped
+    stop_grace_period: ${GOPOD_STOP_GRACE_PERIOD:-3h}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

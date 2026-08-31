@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gopod-config
+data:
+  config.json: |
+    {
+      "Podcasts": [
+        {
+          "Directory": "/data/example-radio-show",
+          "Title": "Example Radio Show",
+          "ShortTitle": "rf",
+          "Image": "https://podcasts.example.com/example-radio-show/artwork.jpg",
+          "URL": "https://podcasts.example.com/example-radio-show/",
+          "PodcastURL": "https://www.example.com/example-radio-show",
+          "SourceURL": "https://stream.example.com/example-radio-show.aac",
+          "Length": 3600,
+          "Extension": "aac"
+        }
+      ]
+    }

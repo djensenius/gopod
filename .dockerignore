@@ -1,0 +1,17 @@
+.git
+.github
+.devcontainer
+.goreleaser.yaml
+.gitignore
+
+deploy
+docs
+
+dist
+gopod
+*.log
+*.md
+
+config.json.sample
+mise.lock
+mise.toml

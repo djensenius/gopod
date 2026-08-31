@@ -1,68 +1,148 @@
 # GoPod
 
-This is a simple tool to record podcasts from online radio sources and build them into podcast feeds.
+GoPod records an online radio stream, captures Icecast track metadata, writes chapter and description data, and generates a podcast RSS feed from the resulting audio files.
 
-Requires `ffmpeg` to be installed.
+## Requirements
 
-## Config
+- Native use: `ffmpeg` must be available on `PATH`.
+- Development: [mise](https://mise.jdx.dev/) installs the pinned Go and validation tools.
+- Container use: no host `ffmpeg` installation is required.
 
-Example config file:
+## Install from source
 
-Format is a JSON object with a `Podcasts` key that is an array of objects. Each object has the following keys:
-- `Directory`: The directory to save the podcast to
-- `Title`: The title of the podcast
-- `ShortTitle`: A short title for the podcast that’s used in the filename
-- `Image`: A URL to an image to use for podcast art
-- `URL`: The URL base for the podcast feed. This is the URL that will be used to access the podcast feed and audio files
-- `PodcastURL`: A link to the website for the podcast feed
-- `SourceURL` The URL of the audio stream
-- `Length`: The length of the podcast in seconds
-- `Extension`: The extension of the audio file (`mp3` or `aac`)
+```sh
+mise install
+mise run build:binary
+```
 
+The binary is written to `./gopod`.
 
-Example config file:
+Tagged releases also publish prebuilt archives for Linux amd64, Linux arm64, macOS arm64, and Windows amd64. Native release archives still require a separate `ffmpeg` installation.
+
+## Configure
+
+GoPod resolves its JSON config in this order:
+
+1. `--config <path>`
+2. `GOPOD_CONFIG`
+3. The preferred platform user config path:
+   - Linux: `${XDG_CONFIG_HOME:-$HOME/.config}/gopod/config.json`
+   - macOS: `~/Library/Application Support/gopod/config.json`
+   - Windows: `%AppData%\gopod\config.json`
+4. Legacy `$HOME/.config/gopod/config.json`, only when the preferred default is absent
+
+Explicit `--config` and `GOPOD_CONFIG` paths are used as given; the legacy path participates only in default discovery.
+
+Start from the sample:
+
+```sh
+cp config.json.sample config.json
+```
+
+The repository-root `/config.json` path is gitignored. Edit the copy, then pass it with `--config`, set `GOPOD_CONFIG`, or move it to the preferred platform config path.
+
+Each object in `Podcasts` supports:
+
+| Key | Description |
+|---|---|
+| `Directory` | Directory where audio, description, and RSS files are written |
+| `Title` | Podcast title |
+| `ShortTitle` | Short command-line identifier and filename prefix; `.gopod` and the `.gopod-` prefix are reserved for internal work files |
+| `Image` | Podcast artwork URL |
+| `URL` | Public base URL for generated audio enclosures |
+| `PodcastURL` | Website URL for the podcast |
+| `SourceURL` | Online audio stream URL |
+| `Length` | Recording length in seconds |
+| `Extension` | Source recording extension, typically `mp3` or `aac` |
+
+Example:
+
 ```json
 {
   "Podcasts": [
     {
-      "Directory": "/Users/david/Downloads/podcasts/test",
-      "Title": "Rare Frequencies",
+      "Directory": "/srv/podcasts/rare-frequency",
+      "Title": "Rare Frequency",
       "ShortTitle": "rf",
-      "Image": "https://farm1.staticflickr.com/742/21709331051_913ccb063a_m.jpg",
-      "URL": "http://www.example.com/podcast1/",
-      "PodcastURL": "https://spinitron.com/WZBC/show/792/Rare-Frequency",
-      "SourceURL": "https://stream.wzbc.org/wzbc",
-      "Length": 7320,
-      "Extension": "mp3"
-    },
-    {
-      "Directory": "/Users/david/Downloads/podcasts/test2",
-      "Title": "Vocal Fry",
-      "ShortTitle": "vf",
-      "Image": "https://blogfiles.wfmu.org/VF/VFNWW_Final.jpg",
-      "URL": "http://www.example.com/podcast2/",
-      "PodcastURL": "https://www.wfmu.org/playlists/VF",
-      "SourceURL": "https://stream0.wfmu.org/freeform-high.aac",
-      "Length": 3720,
+      "Image": "https://podcasts.example.com/rare-frequency/artwork.jpg",
+      "URL": "https://podcasts.example.com/rare-frequency/",
+      "PodcastURL": "https://www.example.com/rare-frequency",
+      "SourceURL": "https://stream.example.com/rare-frequency.aac",
+      "Length": 3600,
       "Extension": "aac"
     }
   ]
 }
 ```
 
-A file called `podcast.rss` is put in the same directory as the audio files.
+GoPod creates the configured output directory when needed. Container configs must use container paths below `/data`, not host filesystem paths.
 
-## Use & example crontab
+## Run
 
-To use the app run:
+Record the podcast whose `ShortTitle` is `rf`:
 
-```./gopod rf```
-
-Replace `rf` with the short title of the podcast you want to record.
-
-I activate the using crontabs. Here are some example crontabs to get you started:
-
+```sh
+./gopod rf
 ```
-59 21 * * 4 /home/david/Code/gopod/gopod rf
-59 19 * * 2 /home/david/Code/gopod/gopod vf
+
+Use a specific config:
+
+```sh
+./gopod --config /path/to/config.json rf
 ```
+
+Show build information:
+
+```sh
+./gopod --version
+```
+
+The recording, matching description file, and `podcast.rss` are written to the podcast's configured directory.
+
+For native scheduling, invoke the same one-shot command from cron or another host scheduler:
+
+```cron
+59 21 * * 4 /usr/local/bin/gopod --config /etc/gopod/config.json rf
+```
+
+## Containers
+
+Release images are published to:
+
+```text
+ghcr.io/djensenius/gopod:vX.Y.Z
+```
+
+The image supports:
+
+- one-shot `docker run` commands;
+- a long-running Supercronic mode for Portainer; and
+- one-shot Kubernetes `CronJob` resources.
+
+See [Container deployment](docs/deployment.md) for mount paths, Portainer Compose setup, Kubernetes examples, permissions, and timezone behavior.
+
+## Development
+
+The committed mise configuration is the source of truth for tool versions and tasks:
+
+```sh
+mise install
+mise run ci
+mise run release:snapshot
+```
+
+Task orchestration uses Bash. On Windows, use Git Bash or the provided devcontainer; the released Windows binary itself has no Bash dependency.
+
+Useful tasks are listed with:
+
+```sh
+mise tasks ls
+```
+
+## Releases
+
+Semantic-version tags publish native archives, checksums, release notes, and multi-platform GHCR images. See [Releasing GoPod](docs/releasing.md) for the release and verification process.
+
+## License
+
+GoPod is released under the terms in [LICENSE](LICENSE).

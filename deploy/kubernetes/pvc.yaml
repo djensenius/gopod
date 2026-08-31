@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gopod-data
+spec:
+  # Replace with a ReadWriteMany-capable StorageClass available in the cluster.
+  storageClassName: rwx-storage-class
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi

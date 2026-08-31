@@ -1,12 +1,26 @@
 {
-	"name": "Go",
-	"image": "mcr.microsoft.com/devcontainers/go",
+	"name": "GoPod",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "latest"
+    "ghcr.io/devcontainers-extra/features/mise:1": {
+      "version": "2026.8.16"
     },
-    "ghcr.io/devcontainers/features/rust:1": {
-      "version": "latest"
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "version": "29.4.3-ubuntu24.04u3",
+      "moby": true,
+      "mobyBuildxVersion": "0.36.1-ubuntu24.04u2",
+      "dockerDashComposeVersion": "v2"
+    }
+  },
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/share/mise/shims:${containerEnv:PATH}"
+  },
+  "postCreateCommand": "mise install && mise reshim",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go"
+      ]
     }
   }
 }
