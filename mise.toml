@@ -1,0 +1,171 @@
+[settings]
+lockfile = true
+
+[tool_config]
+locked = true
+
+[env]
+GOTOOLCHAIN = "local"
+
+[tools]
+actionlint = "1.7.12"
+go = "1.27.0"
+goreleaser = "2.18.0"
+hadolint = "2.15.1"
+jq = "1.8.2"
+kubeconform = "0.8.0"
+kustomize = "5.8.1"
+shellcheck = "0.11.0"
+
+[tasks.fmt]
+description = "Format Go source files"
+run = '''
+#!/usr/bin/env bash
+status=0
+while IFS= read -r -d '' file; do
+  if ! gofmt -w -- "$file"; then
+    status=1
+  fi
+done < <(git ls-files -z --cached --others --exclude-standard -- '*.go')
+exit "$status"
+'''
+
+[tasks."fmt:check"]
+description = "Check Go source formatting"
+run = '''
+#!/usr/bin/env bash
+status=0
+reported=false
+while IFS= read -r -d '' file; do
+  if ! unformatted="$(gofmt -l -- "$file")"; then
+    status=1
+    continue
+  fi
+  if [ -n "$unformatted" ]; then
+    if ! $reported; then
+      printf 'The following files need gofmt:\n'
+      reported=true
+    fi
+    printf '%s\n' "$unformatted"
+    status=1
+  fi
+done < <(git ls-files -z --cached --others --exclude-standard -- '*.go')
+exit "$status"
+'''
+
+[tasks."module:tidy"]
+description = "Tidy Go module metadata"
+run = "go mod tidy"
+
+[tasks."module:check"]
+description = "Check Go module metadata is tidy"
+run = "go mod tidy -diff"
+
+[tasks."module:verify"]
+description = "Verify downloaded Go modules"
+run = "go mod verify"
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks."toolchain:check"]
+description = "Check Go toolchain pins stay aligned"
+run = '''
+#!/usr/bin/env bash
+version="$(go env GOVERSION)"
+version="${version#go}"
+grep -Fqx "go ${version%.*}" go.mod
+grep -Fqx "toolchain go${version}" go.mod
+grep -Fqx "ARG GO_VERSION=${version}" Dockerfile
+grep -Fq "go${version}.linux-amd64.tar.gz" Dockerfile
+grep -Fq "go${version}.linux-arm64.tar.gz" Dockerfile
+'''
+
+[tasks.test]
+description = "Run Go tests"
+run = "go test ./..."
+
+[tasks.build]
+description = "Build all Go packages"
+run = "go build -trimpath ./..."
+
+[tasks."build:binary"]
+description = "Build the local GoPod binary"
+run = "go build -trimpath -o gopod ."
+
+[tasks.run]
+description = "Run GoPod"
+run = "go run ."
+
+[tasks."lint:workflows"]
+description = "Lint GitHub Actions workflows"
+run = "actionlint"
+
+[tasks."lint:shell"]
+description = "Lint container shell scripts"
+run = '''
+#!/usr/bin/env bash
+shellcheck docker/*.sh
+'''
+
+[tasks."lint:docker"]
+description = "Lint the Dockerfile"
+run = "hadolint Dockerfile"
+
+[tasks."lint:kubernetes"]
+description = "Render and validate Kubernetes manifests"
+run = '''
+#!/usr/bin/env bash
+set -o pipefail
+kustomize build deploy/kubernetes | kubeconform -strict -summary
+'''
+
+[tasks."release:check"]
+description = "Validate the GoReleaser configuration"
+run = "goreleaser check"
+
+[tasks."release:snapshot"]
+description = "Build an unpublished snapshot release"
+run = "goreleaser release --snapshot --clean"
+
+[tasks."container:build"]
+description = "Build the local container image"
+run = '''
+#!/usr/bin/env bash
+docker build \
+  --build-arg VERSION=dev \
+  --build-arg COMMIT="$(git rev-parse --short HEAD)" \
+  --build-arg DATE="$(git show -s --format=%cI HEAD)" \
+  --tag gopod:dev \
+  .
+'''
+
+[tasks.lint]
+description = "Run source and configuration linters"
+depends = [
+  "fmt:check",
+  "module:check",
+  "module:verify",
+  "vet",
+  "toolchain:check",
+  "lint:workflows",
+  "lint:shell",
+  "lint:docker",
+  "lint:kubernetes",
+]
+
+[tasks.ci]
+description = "Run the complete non-container CI suite"
+depends = ["lint", "test", "build", "release:check"]
+
+[tasks."release:publish"]
+description = "Publish a tagged release from GitHub Actions"
+run = '''
+#!/usr/bin/env bash
+if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+  echo "release:publish may only run in GitHub Actions" >&2
+  exit 1
+fi
+goreleaser release --clean
+'''

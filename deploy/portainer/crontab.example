@@ -1,0 +1,5 @@
+# Keep this timezone aligned with TZ in the Portainer stack.
+CRON_TZ=Etc/UTC
+
+# Add one command per podcast short title from config.json.
+0 6 * * 1 /usr/local/bin/gopod --config /config/config.json rf

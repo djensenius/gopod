@@ -1,29 +1,116 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
+---
 name: Go
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-
-  build:
+  quality:
+    name: Quality and native release snapshot
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.23.1'
+      - name: Install project tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          cache: true
 
-    - name: Build
-      run: go build -v ./...
+      - name: Run CI checks
+        run: mise run ci
 
-    - name: Test
-      run: go test -v ./...
+      - name: Build release snapshot
+        run: mise run release:snapshot
 
+  container:
+    name: Container build and smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build all container platforms
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build smoke-test image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: gopod:ci
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha
+
+      - name: Smoke-test image
+        shell: bash
+        run: |
+          set -euo pipefail
+          data_dir="$RUNNER_TEMP/gopod-data"
+          config_dir="$RUNNER_TEMP/gopod-config"
+          tmp_dir="$RUNNER_TEMP/gopod-tmp"
+          mkdir -p "$data_dir" "$config_dir" "$tmp_dir"
+          chmod 0777 "$data_dir" "$tmp_dir"
+          touch "$config_dir/config.json"
+          printf '@hourly /usr/local/bin/gopod --version\n' > "$config_dir/crontab"
+
+          docker run --rm gopod:ci --version
+          docker run --rm --entrypoint ffmpeg gopod:ci -version
+          docker run --rm \
+            --entrypoint supercronic \
+            --volume "$config_dir:/config:ro" \
+            gopod:ci -test /config/crontab
+          docker run --rm \
+            --read-only \
+            --tmpfs /tmp \
+            --entrypoint sh \
+            --volume "$data_dir:/data" \
+            gopod:ci -c 'test "$(id -u)" -ne 0 && touch /data/write-test'
+
+      - name: Validate Portainer stack
+        shell: bash
+        run: |
+          GOPOD_CONFIG_DIR="$RUNNER_TEMP/gopod-config" \
+          GOPOD_DATA_PATH="$RUNNER_TEMP/gopod-data" \
+          GOPOD_TMP_PATH="$RUNNER_TEMP/gopod-tmp" \
+          docker compose \
+            --env-file deploy/portainer/.env.example \
+            --file deploy/portainer/compose.yaml \
+            config >/dev/null

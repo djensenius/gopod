@@ -4,20 +4,24 @@ package podcast
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
-  "log"
+	"io"
 	"net/http"
-  "net/url"
-  "os"
+	"net/url"
+	"os"
 	"strconv"
-  "time"
-  "github.com/schollz/progressbar/v3"
-  "github.com/k0kubun/go-ansi"
+	"time"
+
+	"github.com/k0kubun/go-ansi"
+	"github.com/schollz/progressbar/v3"
 )
 
+const streamMetadataTimeout = 30 * time.Second
+
 // GetStreamTitle get the current song/show in an Icecast stream
-func GetStreamTitle(streamUrl string) (string, error) {
-	m, err := getStreamMetas(streamUrl)
+func GetStreamTitle(ctx context.Context, streamURL string) (string, error) {
+	m, err := getStreamMetas(ctx, streamURL)
 
 	if err != nil {
 		return "", err
@@ -27,38 +31,47 @@ func GetStreamTitle(streamUrl string) (string, error) {
 		return "", nil
 	}
 	// Split meta by ';', trim it and search for StreamTitle
-	for _, m := range bytes.Split(m, []byte(";")) {
-		m = bytes.Trim(m, " \t")
-		if !bytes.Equal(m[0:13], []byte("StreamTitle='")) {
+	for _, metadata := range bytes.Split(m, []byte(";")) {
+		metadata = bytes.Trim(metadata, " \t\x00")
+		const prefix = "StreamTitle='"
+		if !bytes.HasPrefix(metadata, []byte(prefix)) {
 			continue
 		}
-		return string(m[13 : len(m)-1]), nil
+		value := bytes.TrimSuffix(metadata[len(prefix):], []byte("'"))
+		return string(value), nil
 	}
 	return "", nil
 }
 
-// get stream metadatas
-func getStreamMetas(streamUrl string) ([]byte, error) {
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", streamUrl, nil)
+// getStreamMetas reads one ICY metadata block from the stream.
+func getStreamMetas(ctx context.Context, streamURL string) ([]byte, error) {
+	client := &http.Client{Timeout: streamMetadataTimeout}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Icy-MetaData", "1")
 	resp, err := client.Do(req)
 	if err != nil {
-		resp.Body.Close()
 		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("metadata request returned %s", resp.Status)
 	}
 
 	// We sent "Icy-MetaData", we should have a "icy-metaint" in return
 	ih := resp.Header.Get("icy-metaint")
 	if ih == "" {
-		resp.Body.Close()
 		return nil, fmt.Errorf("no metadata")
 	}
 	// "icy-metaint" is how often (in bytes) should we receive the meta
 	ib, err := strconv.Atoi(ih)
 	if err != nil {
-		resp.Body.Close()
 		return nil, err
+	}
+	if ib <= 0 {
+		return nil, fmt.Errorf("invalid icy-metaint %q", ih)
 	}
 
 	reader := bufio.NewReader(resp.Body)
@@ -66,143 +79,211 @@ func getStreamMetas(streamUrl string) ([]byte, error) {
 	// skip the first mp3 frame
 	c, err := reader.Discard(ib)
 	if err != nil {
-		resp.Body.Close()
 		return nil, err
 	}
 
-	// If we didn't received ib bytes, the stream is ended
+	// A short discard means the stream ended before the first metadata block.
 	if c != ib {
-		resp.Body.Close()
-		return nil, fmt.Errorf("stream ended prematurally")
+		return nil, fmt.Errorf("stream ended prematurely")
 	}
 
 	// get the size byte, that is the metadata length in bytes / 16
 	sb, err := reader.ReadByte()
 	if err != nil {
-		resp.Body.Close()
 		return nil, err
 	}
-	ms := int(sb * 16)
+	ms := int(sb) * 16
 
 	// read the ms first bytes it will contain metadata
-	m, err := reader.Peek(ms)
-	if err != nil {
-		resp.Body.Close()
+	m := make([]byte, ms)
+	if _, err := io.ReadFull(reader, m); err != nil {
 		return nil, err
 	}
 
-	resp.Body.Close()
 	return m, nil
 }
 
-func MonitorStream(streamUrl string, duration time.Duration, title string) (string, string, error) {
-  overallProgress := time.Now()
-  fileContent := ";FFMETADATA1\n\n"
-  formerTitle := ""
-  count := 0
-  chapterStart := 0
-  notes := ""
-  var t time.Time
+func MonitorStream(
+	ctx context.Context,
+	streamURL string,
+	duration time.Duration,
+	title string,
+) (string, string, error) {
+	overallProgress := time.Now()
+	deadline := overallProgress.Add(duration)
+	fileContent := ";FFMETADATA1\n\n"
+	formerTitle := ""
+	chapterStart := 0
+	notes := ""
 
-  bar := progressbar.NewOptions(int(duration.Seconds()),
-    progressbar.OptionSetWriter(ansi.NewAnsiStdout()), //you should install "github.com/k0kubun/go-ansi"
-    progressbar.OptionEnableColorCodes(true),
-    progressbar.OptionShowBytes(false),
-    progressbar.OptionSetWidth(25),
-    progressbar.OptionSetPredictTime(false),
-    progressbar.OptionSetDescription("[green]🔴 Recording podcast: [blue]" + title + "[reset]"),
-    progressbar.OptionSetTheme(progressbar.Theme{
-      Saucer:        "[green]=[reset]",
-      SaucerHead:    "[green]>[reset]",
-      SaucerPadding: " ",
-      BarStart:      "[",
-      BarEnd:        "]",
-    }))
+	bar := progressbar.NewOptions(int(duration.Seconds()),
+		progressbar.OptionSetWriter(ansi.NewAnsiStdout()),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(false),
+		progressbar.OptionSetWidth(25),
+		progressbar.OptionSetPredictTime(false),
+		progressbar.OptionSetDescription("[green]🔴 Recording podcast: [blue]"+title+"[reset]"),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}))
 
-  for time.Since(overallProgress) < duration {
-    start := time.Now()
-    title, err := GetStreamTitle(streamUrl)
-    if err != nil {
-      return "", "", err
-    }
+	progressSecond := 0
+	updateProgress := func(now time.Time) error {
+		elapsedSecond := recordingElapsedSecond(overallProgress, now, duration)
+		if elapsedSecond <= progressSecond {
+			return nil
+		}
+		if err := bar.Add(elapsedSecond - progressSecond); err != nil {
+			return fmt.Errorf("update recording progress: %w", err)
+		}
+		progressSecond = elapsedSecond
+		return nil
+	}
 
-    if title != formerTitle {
-      if formerTitle != "" {
-        fileContent += "END=" + strconv.Itoa(count) + "\n"
-        fileContent += "title=" + formerTitle + "\n\n"
-        params := url.Values{}
-        params.Add("term", formerTitle)
-  
-        bandCampParams := url.Values{}
-        bandCampParams.Add("q", formerTitle)
-        t = t.Add(time.Duration(chapterStart) * time.Second)
-        startFormat := t.Format("15:04:05")
-        t = t.Add(time.Duration(count) * time.Second)
-        endFormat := t.Format("15:04:05")
+	for {
+		start := time.Now()
+		if !start.Before(deadline) {
+			break
+		}
+		if err := ctx.Err(); err != nil {
+			return "", "", err
+		}
+		// Poll starts stay at least one second apart, even when a read is slow.
+		sampleSecond := recordingElapsedSecond(
+			overallProgress,
+			start,
+			duration,
+		)
+		if err := updateProgress(start); err != nil {
+			return "", "", err
+		}
 
-        notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
-        notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
-        notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a><br /> "
-      }
+		streamTitle, err := GetStreamTitle(ctx, streamURL)
+		if err != nil {
+			return "", "", err
+		}
+		if streamTitle == "" {
+			streamTitle = "Unknown"
+		}
 
-      fileContent += "[CHAPTER]\n"
-      fileContent += "TIMEBASE=1/1\n"
-      fileContent += "START=" + strconv.Itoa(count + 1) + "\n"
-      chapterStart = count
-      if title != "" {
-        formerTitle = title
-      } else {
-        formerTitle = "Unknown"
-      }
-    }
+		if streamTitle != formerTitle {
+			if formerTitle != "" {
+				fileContent += "END=" + strconv.Itoa(sampleSecond) + "\n"
+				fileContent += "title=" + formerTitle + "\n\n"
+				params := url.Values{}
+				params.Add("term", formerTitle)
 
-    // Don't query more than once a second
-    timeLeft := time.Second - time.Since(start)
-    if timeLeft > 0 {
-      time.Sleep(timeLeft)
-      err = bar.Add(1)
-      if err != nil {
-        log.Fatalf("Could not add to progress bar %s", err.Error())
-      }
-    }
-    count += 1
-  }
+				bandCampParams := url.Values{}
+				bandCampParams.Add("q", formerTitle)
+				startFormat, endFormat := formatChapterRange(
+					chapterStart,
+					sampleSecond,
+				)
 
-  fileContent += "END=" + strconv.Itoa(count) + "\n"
-  fileContent += "title=" + formerTitle + "\n\n"
+				notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
+				notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
+				notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a><br /> "
+			}
 
-  t = t.Add(time.Duration(chapterStart) * time.Second)
-  startFormat := t.Format("15:04:05")
-  t = t.Add(time.Duration(count) * time.Second)
-  endFormat := t.Format("15:04:05")
+			fileContent += "[CHAPTER]\n"
+			fileContent += "TIMEBASE=1/1\n"
+			fileContent += "START=" + strconv.Itoa(sampleSecond+1) + "\n"
+			chapterStart = sampleSecond
+			formerTitle = streamTitle
+		}
 
-  notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
-  params := url.Values{}
+		// Don't query more than once a second
+		timeLeft := time.Second - time.Since(start)
+		if timeLeft > 0 {
+			timer := time.NewTimer(timeLeft)
+			select {
+			case <-ctx.Done():
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return "", "", ctx.Err()
+			case <-timer.C:
+			}
+		}
+		if err := updateProgress(time.Now()); err != nil {
+			return "", "", err
+		}
+	}
+	if err := updateProgress(time.Now()); err != nil {
+		return "", "", err
+	}
+
+	fileContent += "END=" + strconv.Itoa(progressSecond) + "\n"
+	fileContent += "title=" + formerTitle + "\n\n"
+
+	startFormat, endFormat := formatChapterRange(chapterStart, progressSecond)
+
+	notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
+	params := url.Values{}
 	params.Add("term", formerTitle)
-  
-  bandCampParams := url.Values{}
-  bandCampParams.Add("q", formerTitle)
 
-  notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
-  notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a><br /> "
-  f, err := os.CreateTemp("", "*.txt")
-  if err != nil {
-    return "", "", err
-  }
+	bandCampParams := url.Values{}
+	bandCampParams.Add("q", formerTitle)
 
-  if _, err := f.Write([]byte(fileContent)); err != nil {
-    return "", "", err
-  }
+	notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
+	notes += "<a href=\"https://bandcamp.com/search?" + bandCampParams.Encode() + "\">Bandcamp</a><br /> "
+	metadataFile, err := writeTempTextFile("gopod-metadata-*.txt", fileContent)
+	if err != nil {
+		return "", "", err
+	}
+	descriptionFile, err := writeTempTextFile("gopod-description-*.txt", notes)
+	if err != nil {
+		os.Remove(metadataFile)
+		return "", "", err
+	}
 
-  noteFile, err := os.CreateTemp("", "*.txt")
-  
-  if err != nil {
-    return "", "", err
-  }
+	return metadataFile, descriptionFile, nil
+}
 
-  if _, err := noteFile.Write([]byte(notes)); err != nil {
-    return "", "", err
-  }
+func recordingElapsedSecond(
+	start time.Time,
+	now time.Time,
+	duration time.Duration,
+) int {
+	if duration <= 0 || now.Before(start) {
+		return 0
+	}
+	elapsed := now.Sub(start)
+	if elapsed > duration {
+		elapsed = duration
+	}
+	return int(elapsed / time.Second)
+}
 
-  return f.Name(), noteFile.Name(), nil
+func formatChapterRange(chapterStart, chapterEnd int) (string, string) {
+	var zero time.Time
+	start := zero.Add(time.Duration(chapterStart) * time.Second)
+	end := zero.Add(time.Duration(chapterEnd) * time.Second)
+	return start.Format("15:04:05"), end.Format("15:04:05")
+}
+
+func writeTempTextFile(pattern, content string) (path string, err error) {
+	f, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return "", err
+	}
+	path = f.Name()
+	defer func() {
+		if err != nil {
+			f.Close()
+			os.Remove(path)
+		}
+	}()
+
+	if _, err := f.WriteString(content); err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return path, nil
 }

@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gopod-example-radio-show
+spec:
+  schedule: "0 6 * * 1"
+  timeZone: Etc/UTC
+  # Prevent overlapping Jobs from this CronJob; this is not an exactly-once guarantee.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Recording is not idempotent, so do not retry failed Pods.
+      backoffLimit: 0
+      activeDeadlineSeconds: 14400
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: gopod
+              image: ghcr.io/djensenius/gopod:v0.1.0
+              imagePullPolicy: IfNotPresent
+              args:
+                - rf
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 100m
+                  ephemeral-storage: 256Mi
+                  memory: 128Mi
+                limits:
+                  cpu: "1"
+                  ephemeral-storage: 2Gi
+                  memory: 512Mi
+              volumeMounts:
+                - name: config
+                  mountPath: /config/config.json
+                  subPath: config.json
+                  readOnly: true
+                - name: data
+                  mountPath: /data
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: config
+              configMap:
+                name: gopod-config
+            - name: data
+              persistentVolumeClaim:
+                claimName: gopod-data
+            - name: tmp
+              emptyDir:
+                sizeLimit: 2Gi

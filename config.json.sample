@@ -1,14 +1,14 @@
 {
   "Podcasts": [
     {
-      "Directory": "/Users/david/Downloads/podcasts/test",
-      "Title": "Rare Frequencies",
+      "Directory": "/data/rare-frequency",
+      "Title": "Example Radio Show",
       "ShortTitle": "rf",
-      "Image": "http://www.rarefrequency.com/images/495-podcast65.jpg",
-      "URL": "http://www.example.com/podcast1/",
-      "PodcastURL": "https://spinitron.com/WZBC/show/792/Rare-Frequency",
-      "SourceURL": "https://example.com/stream.aac",
-      "Length": 10,
+      "Image": "https://podcasts.example.com/example-radio-show/artwork.jpg",
+      "URL": "https://podcasts.example.com/example-radio-show/",
+      "PodcastURL": "https://www.example.com/example-radio-show",
+      "SourceURL": "https://stream.example.com/example-radio-show.aac",
+      "Length": 3600,
       "Extension": "aac"
     }
   ]
