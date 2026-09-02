@@ -92,7 +92,7 @@ func getStreamMetas(ctx context.Context, streamURL string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	ms := int(sb * 16)
+	ms := int(sb) * 16
 
 	// read the ms first bytes it will contain metadata
 	m := make([]byte, ms)
