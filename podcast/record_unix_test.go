@@ -102,6 +102,34 @@ func TestCombineCancellationCleansPartialAndPreservesCompletedFiles(t *testing.T
 	}
 }
 
+func TestCombineDescriptionReadErrorIncludesPath(t *testing.T) {
+	tempDir := t.TempDir()
+	ffmpegPath := filepath.Join(tempDir, "ffmpeg")
+	script := "#!/bin/sh\n" +
+		"output=''\n" +
+		"for argument in \"$@\"; do output=\"$argument\"; done\n" +
+		"printf 'combined audio' > \"$output\"\n"
+	if err := os.WriteFile(ffmpegPath, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tempDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	descriptionPath := filepath.Join(tempDir, "missing-description.txt")
+	err := Combine(
+		context.Background(),
+		Podcast{ShortTitle: "description-error", Directory: tempDir},
+		filepath.Join(tempDir, "input.aac"),
+		filepath.Join(tempDir, "metadata.txt"),
+		descriptionPath,
+	)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("got error %v, want missing description error", err)
+	}
+	if !strings.Contains(err.Error(), descriptionPath) {
+		t.Fatalf("error %q does not include description path %q", err, descriptionPath)
+	}
+}
+
 func TestCombineCleanupPreservesReplacementAudioStage(t *testing.T) {
 	tempDir := t.TempDir()
 	ffmpegPath := filepath.Join(tempDir, "ffmpeg")

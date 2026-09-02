@@ -119,7 +119,11 @@ func Combine(
 	if descriptionFile != "" {
 		data, err := os.ReadFile(descriptionFile)
 		if err != nil {
-			return fmt.Errorf("read podcast description: %w", err)
+			return fmt.Errorf(
+				"read podcast description %q: %w",
+				descriptionFile,
+				err,
+			)
 		}
 		descriptionStage, descriptionStageIdentity, err = createClosedTempFile(
 			podcast.Directory,
