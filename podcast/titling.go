@@ -43,7 +43,7 @@ func GetStreamTitle(ctx context.Context, streamURL string) (string, error) {
 	return "", nil
 }
 
-// get stream metadatas
+// getStreamMetas reads one ICY metadata block from the stream.
 func getStreamMetas(ctx context.Context, streamURL string) ([]byte, error) {
 	client := &http.Client{Timeout: streamMetadataTimeout}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
@@ -82,9 +82,9 @@ func getStreamMetas(ctx context.Context, streamURL string) ([]byte, error) {
 		return nil, err
 	}
 
-	// If we didn't received ib bytes, the stream is ended
+	// A short discard means the stream ended before the first metadata block.
 	if c != ib {
-		return nil, fmt.Errorf("stream ended prematurally")
+		return nil, fmt.Errorf("stream ended prematurely")
 	}
 
 	// get the size byte, that is the metadata length in bytes / 16
