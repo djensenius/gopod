@@ -110,9 +110,9 @@ func MonitorStream(
 	title string,
 ) (string, string, error) {
 	overallProgress := time.Now()
+	deadline := overallProgress.Add(duration)
 	fileContent := ";FFMETADATA1\n\n"
 	formerTitle := ""
-	count := 0
 	chapterStart := 0
 	notes := ""
 
@@ -131,12 +131,37 @@ func MonitorStream(
 			BarEnd:        "]",
 		}))
 
-	for time.Since(overallProgress) < duration {
+	progressSecond := 0
+	updateProgress := func(now time.Time) error {
+		elapsedSecond := recordingElapsedSecond(overallProgress, now, duration)
+		if elapsedSecond <= progressSecond {
+			return nil
+		}
+		if err := bar.Add(elapsedSecond - progressSecond); err != nil {
+			return fmt.Errorf("update recording progress: %w", err)
+		}
+		progressSecond = elapsedSecond
+		return nil
+	}
+
+	for {
+		start := time.Now()
+		if !start.Before(deadline) {
+			break
+		}
 		if err := ctx.Err(); err != nil {
 			return "", "", err
 		}
+		// Poll starts stay at least one second apart, even when a read is slow.
+		sampleSecond := recordingElapsedSecond(
+			overallProgress,
+			start,
+			duration,
+		)
+		if err := updateProgress(start); err != nil {
+			return "", "", err
+		}
 
-		start := time.Now()
 		streamTitle, err := GetStreamTitle(ctx, streamURL)
 		if err != nil {
 			return "", "", err
@@ -144,14 +169,17 @@ func MonitorStream(
 
 		if streamTitle != formerTitle {
 			if formerTitle != "" {
-				fileContent += "END=" + strconv.Itoa(count) + "\n"
+				fileContent += "END=" + strconv.Itoa(sampleSecond) + "\n"
 				fileContent += "title=" + formerTitle + "\n\n"
 				params := url.Values{}
 				params.Add("term", formerTitle)
 
 				bandCampParams := url.Values{}
 				bandCampParams.Add("q", formerTitle)
-				startFormat, endFormat := formatChapterRange(chapterStart, count)
+				startFormat, endFormat := formatChapterRange(
+					chapterStart,
+					sampleSecond,
+				)
 
 				notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
 				notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
@@ -160,8 +188,8 @@ func MonitorStream(
 
 			fileContent += "[CHAPTER]\n"
 			fileContent += "TIMEBASE=1/1\n"
-			fileContent += "START=" + strconv.Itoa(count+1) + "\n"
-			chapterStart = count
+			fileContent += "START=" + strconv.Itoa(sampleSecond+1) + "\n"
+			chapterStart = sampleSecond
 			if streamTitle != "" {
 				formerTitle = streamTitle
 			} else {
@@ -182,16 +210,18 @@ func MonitorStream(
 			case <-timer.C:
 			}
 		}
-		if err := bar.Add(1); err != nil {
-			return "", "", fmt.Errorf("update recording progress: %w", err)
+		if err := updateProgress(time.Now()); err != nil {
+			return "", "", err
 		}
-		count += 1
+	}
+	if err := updateProgress(time.Now()); err != nil {
+		return "", "", err
 	}
 
-	fileContent += "END=" + strconv.Itoa(count) + "\n"
+	fileContent += "END=" + strconv.Itoa(progressSecond) + "\n"
 	fileContent += "title=" + formerTitle + "\n\n"
 
-	startFormat, endFormat := formatChapterRange(chapterStart, count)
+	startFormat, endFormat := formatChapterRange(chapterStart, progressSecond)
 
 	notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
 	params := url.Values{}
@@ -213,6 +243,21 @@ func MonitorStream(
 	}
 
 	return metadataFile, descriptionFile, nil
+}
+
+func recordingElapsedSecond(
+	start time.Time,
+	now time.Time,
+	duration time.Duration,
+) int {
+	if duration <= 0 || now.Before(start) {
+		return 0
+	}
+	elapsed := now.Sub(start)
+	if elapsed > duration {
+		elapsed = duration
+	}
+	return int(elapsed / time.Second)
 }
 
 func formatChapterRange(chapterStart, chapterEnd int) (string, string) {
