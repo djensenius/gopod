@@ -22,7 +22,7 @@ type podcastLock struct {
 
 func acquirePodcastLock(selected podcast.Podcast) (*podcastLock, error) {
 	path := podcastLockPath(selected)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o666)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"open lock for podcast %q at %q: %w",

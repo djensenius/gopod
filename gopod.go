@@ -133,6 +133,9 @@ func versionOutput() string {
 }
 
 func ensureOutputDirectory(path string) error {
+	if path == "" {
+		return errors.New("podcast output directory must not be empty")
+	}
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		return fmt.Errorf("create podcast output directory %q: %w", path, err)
 	}

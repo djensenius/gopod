@@ -335,6 +335,16 @@ func TestRunRejectsReservedShortTitleBeforeOutputCreation(t *testing.T) {
 }
 
 func TestEnsureOutputDirectory(t *testing.T) {
+	t.Run("rejects empty path", func(t *testing.T) {
+		err := ensureOutputDirectory("")
+		if err == nil {
+			t.Fatal("expected empty directory error")
+		}
+		if !strings.Contains(err.Error(), "must not be empty") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("creates nested directory", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "podcasts", "rf")
 		if err := ensureOutputDirectory(path); err != nil {
