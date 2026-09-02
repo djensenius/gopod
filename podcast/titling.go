@@ -166,6 +166,9 @@ func MonitorStream(
 		if err != nil {
 			return "", "", err
 		}
+		if streamTitle == "" {
+			streamTitle = "Unknown"
+		}
 
 		if streamTitle != formerTitle {
 			if formerTitle != "" {
@@ -190,11 +193,7 @@ func MonitorStream(
 			fileContent += "TIMEBASE=1/1\n"
 			fileContent += "START=" + strconv.Itoa(sampleSecond+1) + "\n"
 			chapterStart = sampleSecond
-			if streamTitle != "" {
-				formerTitle = streamTitle
-			} else {
-				formerTitle = "Unknown"
-			}
+			formerTitle = streamTitle
 		}
 
 		// Don't query more than once a second

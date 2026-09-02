@@ -128,6 +128,53 @@ func TestMonitorStreamUsesElapsedTimeForSlowMetadataReads(t *testing.T) {
 	}
 }
 
+func TestMonitorStreamUsesUnknownForEmptyTitles(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(
+		w http.ResponseWriter,
+		_ *http.Request,
+	) {
+		w.Header().Set("icy-metaint", "1")
+		_, _ = w.Write([]byte{'x', 0})
+	}))
+	t.Cleanup(server.Close)
+
+	metadataPath, descriptionPath, err := MonitorStream(
+		context.Background(),
+		server.URL,
+		time.Second,
+		"Unknown Title Test",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Remove(metadataPath)
+		_ = os.Remove(descriptionPath)
+	})
+
+	metadata, err := os.ReadFile(metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "START=1\nEND=1\ntitle=Unknown"; !strings.Contains(
+		string(metadata),
+		want,
+	) {
+		t.Fatalf("metadata %q does not contain %q", metadata, want)
+	}
+
+	description, err := os.ReadFile(descriptionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "[00:00:00 - 00:00:01]: Unknown"; !strings.Contains(
+		string(description),
+		want,
+	) {
+		t.Fatalf("description %q does not contain %q", description, want)
+	}
+}
+
 func TestGetStreamTitleHandlesShortMetadataSegments(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		metadata := []byte("x;StreamTitle='Example Show';")
