@@ -10,6 +10,34 @@ import (
 	"time"
 )
 
+func TestFormatChapterRangeDoesNotAccumulatePriorRanges(t *testing.T) {
+	tests := []struct {
+		chapterStart int
+		chapterEnd   int
+		wantStart    string
+		wantEnd      string
+	}{
+		{chapterStart: 0, chapterEnd: 10, wantStart: "00:00:00", wantEnd: "00:00:10"},
+		{chapterStart: 10, chapterEnd: 20, wantStart: "00:00:10", wantEnd: "00:00:20"},
+		{chapterStart: 20, chapterEnd: 30, wantStart: "00:00:20", wantEnd: "00:00:30"},
+	}
+
+	for _, test := range tests {
+		gotStart, gotEnd := formatChapterRange(test.chapterStart, test.chapterEnd)
+		if gotStart != test.wantStart || gotEnd != test.wantEnd {
+			t.Fatalf(
+				"formatChapterRange(%d, %d) = (%q, %q), want (%q, %q)",
+				test.chapterStart,
+				test.chapterEnd,
+				gotStart,
+				gotEnd,
+				test.wantStart,
+				test.wantEnd,
+			)
+		}
+	}
+}
+
 func TestGetStreamTitleHandlesShortMetadataSegments(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		metadata := []byte("x;StreamTitle='Example Show';")

@@ -102,6 +102,60 @@ func TestCombineCancellationCleansPartialAndPreservesCompletedFiles(t *testing.T
 	}
 }
 
+func TestCombineCleanupPreservesReplacementAudioStage(t *testing.T) {
+	tempDir := t.TempDir()
+	ffmpegPath := filepath.Join(tempDir, "ffmpeg")
+	outputPathFile := filepath.Join(tempDir, "ffmpeg.output")
+	script := "#!/bin/sh\n" +
+		"output=''\n" +
+		"for argument in \"$@\"; do output=\"$argument\"; done\n" +
+		"printf '%s\\n' \"$output\" > \"$GOPOD_TEST_OUTPUT_PATH\"\n" +
+		"mv \"$output\" \"$output.owned\"\n" +
+		"printf 'replacement audio stage' > \"$output\"\n" +
+		"exit 1\n"
+	if err := os.WriteFile(ffmpegPath, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOPOD_TEST_OUTPUT_PATH", outputPathFile)
+	t.Setenv("PATH", tempDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	inputAudio := filepath.Join(tempDir, "input.aac")
+	inputMetadata := filepath.Join(tempDir, "metadata.txt")
+	for path, content := range map[string]string{
+		inputAudio:    "input audio",
+		inputMetadata: ";FFMETADATA1\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := Combine(
+		context.Background(),
+		Podcast{ShortTitle: "cleanup-owner", Directory: tempDir},
+		inputAudio,
+		inputMetadata,
+		"",
+	)
+	if err == nil {
+		t.Fatal("expected ffmpeg and staging ownership errors")
+	}
+	if !strings.Contains(err.Error(), "run ffmpeg combiner") ||
+		!strings.Contains(err.Error(), "refuse to remove staging file") ||
+		!strings.Contains(err.Error(), "restored the claimed file") {
+		t.Fatalf("error %q does not report atomic-claim audio cleanup", err)
+	}
+
+	data, err := os.ReadFile(outputPathFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	audioStage := strings.TrimSpace(string(data))
+	assertFileContent(t, audioStage, "replacement audio stage")
+	assertFileContent(t, audioStage+".owned", "")
+	assertNoOwnedFileCleanupDirectories(t, tempDir)
+}
+
 func assertCombineFFmpegArguments(t *testing.T, path string) {
 	t.Helper()
 	data, err := os.ReadFile(path)

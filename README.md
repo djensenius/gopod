@@ -97,7 +97,7 @@ Show build information:
 ./gopod --version
 ```
 
-The recording, matching description file, and `podcast.rss` are written to the podcast's configured directory.
+The recording, matching description file, `podcast.rss`, and hidden `.gopod-*` publication controls are written to the podcast's configured directory. Preserve those hidden controls when copying or backing up the directory; GoPod uses them to exclude incomplete recordings from regenerated feeds.
 
 For native scheduling, invoke the same one-shot command from cron or another host scheduler:
 

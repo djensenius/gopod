@@ -18,10 +18,26 @@ func renameNoReplace(oldPath, newPath string) error {
 	if err != nil {
 		return err
 	}
-	err = windows.MoveFile(oldPathPointer, newPathPointer)
+	err = windows.MoveFileEx(
+		oldPathPointer,
+		newPathPointer,
+		windows.MOVEFILE_WRITE_THROUGH,
+	)
 	if errors.Is(err, windows.ERROR_FILE_EXISTS) ||
 		errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
 		return os.ErrExist
 	}
 	return err
+}
+
+func restoreNoReplace(oldPath, newPath string) error {
+	return renameNoReplace(oldPath, newPath)
+}
+
+func publishVisibilityMarker(
+	oldPath string,
+	newPath string,
+	_ os.FileInfo,
+) error {
+	return renameNoReplace(oldPath, newPath)
 }

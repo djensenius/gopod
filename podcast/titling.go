@@ -115,7 +115,6 @@ func MonitorStream(
 	count := 0
 	chapterStart := 0
 	notes := ""
-	var t time.Time
 
 	bar := progressbar.NewOptions(int(duration.Seconds()),
 		progressbar.OptionSetWriter(ansi.NewAnsiStdout()),
@@ -152,10 +151,7 @@ func MonitorStream(
 
 				bandCampParams := url.Values{}
 				bandCampParams.Add("q", formerTitle)
-				t = t.Add(time.Duration(chapterStart) * time.Second)
-				startFormat := t.Format("15:04:05")
-				t = t.Add(time.Duration(count) * time.Second)
-				endFormat := t.Format("15:04:05")
+				startFormat, endFormat := formatChapterRange(chapterStart, count)
 
 				notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
 				notes += "<a href=\"https://music.apple.com/ca/search?" + params.Encode() + "\">Apple Music</a> | "
@@ -195,10 +191,7 @@ func MonitorStream(
 	fileContent += "END=" + strconv.Itoa(count) + "\n"
 	fileContent += "title=" + formerTitle + "\n\n"
 
-	t = t.Add(time.Duration(chapterStart) * time.Second)
-	startFormat := t.Format("15:04:05")
-	t = t.Add(time.Duration(count) * time.Second)
-	endFormat := t.Format("15:04:05")
+	startFormat, endFormat := formatChapterRange(chapterStart, count)
 
 	notes += "[" + startFormat + " - " + endFormat + "]: " + formerTitle + "\n"
 	params := url.Values{}
@@ -220,6 +213,13 @@ func MonitorStream(
 	}
 
 	return metadataFile, descriptionFile, nil
+}
+
+func formatChapterRange(chapterStart, chapterEnd int) (string, string) {
+	var zero time.Time
+	start := zero.Add(time.Duration(chapterStart) * time.Second)
+	end := zero.Add(time.Duration(chapterEnd) * time.Second)
+	return start.Format("15:04:05"), end.Format("15:04:05")
 }
 
 func writeTempTextFile(pattern, content string) (path string, err error) {

@@ -130,4 +130,4 @@ kubectl logs job/<job-name>
 
 ## Persistent data
 
-Back up `/data`; it contains the recordings, generated descriptions, and `podcast.rss`. Configuration can be restored separately from the read-only `/config` mount.
+Back up the complete `/data` tree, including hidden `.gopod-*` publication controls. Those controls let GoPod distinguish committed recordings from interrupted writes when regenerating `podcast.rss`; copying only the visible audio and description files can hide new-format episodes. Configuration can be restored separately from the read-only `/config` mount.
