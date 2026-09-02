@@ -52,6 +52,30 @@ func TestValidateShortTitle(t *testing.T) {
 	}
 }
 
+func TestFindPodcastSkipsNilEntries(t *testing.T) {
+	configured := &Podcast{
+		Title:      "Configured Show",
+		ShortTitle: "configured",
+	}
+	podcasts := Podcasts{
+		Podcasts: []*Podcast{nil, configured},
+	}
+
+	got, err := FindPodcast(configured.ShortTitle, podcasts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != *configured {
+		t.Fatalf("got podcast %#v, want %#v", got, *configured)
+	}
+
+	if _, err := FindPodcast("missing", Podcasts{
+		Podcasts: []*Podcast{nil},
+	}); err == nil {
+		t.Fatal("expected missing podcast error")
+	}
+}
+
 func TestParseGeneratedPublicationStemFromEnd(t *testing.T) {
 	recordedAt := time.Unix(1_700_000_000, 123)
 	token := bytes.Repeat([]byte{0xab}, publicationTokenSize)

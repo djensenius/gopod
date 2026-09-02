@@ -90,6 +90,9 @@ func FindPodcast(shortName string, p Podcasts) (Podcast, error) {
 	podcast := Podcast{}
 	found := false
 	for _, pc := range p.Podcasts {
+		if pc == nil {
+			continue
+		}
 		if pc.ShortTitle == shortName {
 			podcast = *pc
 			found = true
