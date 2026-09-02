@@ -99,7 +99,7 @@ func FindPodcast(shortName string, p Podcasts) (Podcast, error) {
 		}
 	}
 	if !found {
-		return podcast, errors.New("Podcast not found")
+		return podcast, errors.New("podcast not found")
 	}
 	return podcast, nil
 }

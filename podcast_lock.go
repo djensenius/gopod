@@ -31,6 +31,17 @@ func acquirePodcastLock(selected podcast.Podcast) (*podcastLock, error) {
 			err,
 		)
 	}
+	if err := file.Chmod(0o600); err != nil {
+		return nil, errors.Join(
+			fmt.Errorf(
+				"set lock permissions for podcast %q at %q: %w",
+				selected.ShortTitle,
+				path,
+				err,
+			),
+			file.Close(),
+		)
+	}
 
 	if err := tryLockFile(file); err != nil {
 		closeErr := file.Close()
